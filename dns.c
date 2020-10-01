@@ -1,32 +1,33 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
+#include <netinet/in.h>
 
 #define T_MX 15
 #define PORT 53
 
-void ChangeToDnsNameFormat(unsigned char *dns, unsigned char *host);
+void DnsFormat(unsigned char *dns, unsigned char *host);
 
 typedef struct {
-    unsigned short int query;
+    uint16_t type;
+    uint16_t class;
+} query;
+
+typedef struct {
+    unsigned short int transaction;
     uint16_t flags;
     uint16_t question;
     uint16_t answer;
     uint16_t authority;
     uint16_t additional;
-} udp_header;
+} udp;
 
-typedef struct {
-    uint16_t type;
-    uint16_t class;
-} infos;
 
-void ChangeToDnsNameFormat(unsigned char *dns, unsigned char *host) {
+void DnsFormat(unsigned char *dns, unsigned char *host) {
     int lock = 0, i;
     char *host_aux = (char *) (malloc(sizeof(host) + 1));
     strcpy(host_aux, host);
@@ -47,24 +48,24 @@ int main(int argc, char **argv) {
     unsigned char *msg = argv[1];
     unsigned char *address = argv[2];
 
-    unsigned char buffer[65536];
+    unsigned char package[65536];
     struct sockaddr_in dest;
     struct timeval timeout = {6, 0};
 
-    memset(buffer, 0, 65536);
-    udp_header *payload = (udp_header *) buffer;
+    memset(package, 0, 65536);
+    udp *payload = (udp *) package;
 
-    payload->query = htons(rand());
+    payload->transaction = htons(rand());
     payload->flags = htons(0x0100);
     payload->question = htons(1);
     payload->answer = htons(0);
     payload->authority = htons(0);
     payload->additional = htons(0);
 
-    char *data = (buffer + sizeof(udp_header));
-    ChangeToDnsNameFormat(data, msg);
+    char *data = (package + sizeof(udp));
+    DnsFormat(data, msg);
     unsigned int len = strlen(data) + 1;
-    infos *end = (infos *) (buffer + sizeof(udp_header) + len);
+    query *end = (query *) (package + sizeof(udp) + len);
     end->type = htons(T_MX);
     end->class = htons(1);
 
@@ -79,13 +80,13 @@ int main(int argc, char **argv) {
     dest.sin_addr.s_addr = inet_addr(address);
     setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &timeout, sizeof(struct timeval));
 
-    const int package = sizeof(udp_header) + len + sizeof(infos);
+    const int package_len = sizeof(udp) + len + sizeof(query);
 
     int n, s, i;
     int server_addr_len;
     for (i = 0; i < 3; i++) {
-        s = sendto(socket_fd, buffer, package, 0, (struct sockaddr *) &dest, sizeof(dest));
-        n = recvfrom(socket_fd, (char *) buffer, 65536, 0, (struct sockaddr *) &dest, &server_addr_len);
+        s = sendto(socket_fd, package, package_len, 0, (struct sockaddr *) &dest, sizeof(dest));
+        n = recvfrom(socket_fd, (char *) package, 65536, 0, (struct sockaddr *) &dest, &server_addr_len);
         sleep(2);
 
         if (n > 0)
@@ -94,7 +95,7 @@ int main(int argc, char **argv) {
     if (i == 3) {
         printf("Nao foi possível coletar entrada MX para %s\n", msg);
         return 0;
-    } else if (buffer[35] % 38) {
+    } else if (package[35] % 38) {
         printf("Dominio %s nao encontrado\n", msg);
     } else {
         if (n > 75) {
@@ -104,13 +105,13 @@ int main(int argc, char **argv) {
 
         printf("%s <> %c%c%c%c%c%c.%c%c%c%c.%c%c%c%c%c%c%c%c%c%c.%c%c%c%c%c%c%c.%c%c%c\n",
                msg,
-               buffer[n - 35], buffer[n - 34], buffer[n - 33], buffer[n - 32], buffer[n - 31], buffer[n - 30],
-               buffer[n - 28], buffer[n - 27], buffer[n - 26],
-               buffer[n - 25], buffer[n - 23], buffer[n - 22],
-               buffer[n - 21], buffer[n - 20], buffer[n - 19], buffer[n - 18], buffer[n - 17], buffer[n - 16],
-               buffer[n - 15], buffer[n - 14], buffer[n - 12],
-               buffer[n - 11], buffer[n - 10], buffer[n - 9], buffer[n - 8], buffer[n - 7], buffer[n - 6],
-               buffer[n - 4], buffer[n - 3], buffer[n - 2]);
+               package[n-35], package[n-34], package[n-33], package[n-32], package[n - 31], package[n - 30],
+               package[n-28], package[n-27], package[n-26],
+               package[n-25], package[n-23], package[n-22],
+               package[n-21], package[n-20], package[n-19], package[n-18], package[n-17], package[n-16],
+               package[n-15], package[n-14], package[n-12],
+               package[n-11], package[n-10], package[n-9], package[n - 8], package[n - 7], package[n - 6],
+               package[n-4],  package[n-3],  package[n-2]);
     }
     close(socket_fd);
     return 0;
