@@ -97,11 +97,58 @@ int main(int argc, char **argv) {
     } else if (buffer[35] % 38) {
         printf("Dominio %s nao encontrado\n", msg);
     } else {
-        if (n > 75) {
-            printf("Dominio %s nao possui entrada MX\n", msg);
-            return 0;
+//        if (n > 75) {
+  //          printf("Dominio %s nao possui entrada MX\n", msg);
+    //        return 0;
+      //  }
+      
+      int len = 1, index = 0, marker = 0;
+      char * domain = malloc(100*sizeof(char*));
+      for(int k = 12; len > 0; k += len+1){
+        len = (int) buffer[k];
+        printf("K[%2x] = len[%d]\n", buffer[k], len);
+        if(buffer[len+2] == 0xc){printf("BUFFER COMPRESSAO = %02x\n", buffer[(int)buffer[len+3]]);break;}
+        for(int l = k+1; l < k+len+1; l++, index++){
+          domain[index] = buffer[l];
+          marker = l;
         }
+        domain[index++] = '.';
+      }
+      domain[index] = '\0';
+      marker += 20;
+      char*mail = malloc(200*sizeof(char*));
+      len = 1;
+      index = 0;
 
+      for(int k = marker; len > 0; k += len+1){
+        len = (int)buffer[k];
+        for(int l = k+1; l < k+len+1; l++, index++){
+          mail[index] = buffer[l];
+
+        }
+        mail[index++] = '.';
+      }
+      mail[index] = '\0';
+      printf("MAIL-CERTO: %s\n", mail);
+      printf("ANSWERS: %d\n", buffer[7]);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      printf("RES_STRING = %s\n", domain);
+      printf("INDEX: %d BUFFER: %c\n", marker, buffer[marker]);
+      printf("MAIL: %c%c%c%c%c%c\n", buffer[marker+16], buffer[marker+17], buffer[marker+18], buffer[marker+19], buffer[marker+20], buffer[marker+21]);
         printf("%s <> %c%c%c%c%c%c.%c%c%c%c.%c%c%c%c%c%c%c%c%c%c.%c%c%c%c%c%c%c.%c%c%c\n",
                msg,
                buffer[n - 35], buffer[n - 34], buffer[n - 33], buffer[n - 32], buffer[n - 31], buffer[n - 30],
@@ -112,6 +159,16 @@ int main(int argc, char **argv) {
                buffer[n - 11], buffer[n - 10], buffer[n - 9], buffer[n - 8], buffer[n - 7], buffer[n - 6],
                buffer[n - 4], buffer[n - 3], buffer[n - 2]);
     }
+    printf("-------------------------------------------------\n");
+    for(int g = 0; g < n; g++)
+    printf("%02x |", buffer[g]);
+    printf("\n");
+    printf("-------------------------------------------------\n");
+    for(int g = 0; g < n; g++)
+    printf("%c|", (char)buffer[g]);
+    printf("\n");
+    printf("BYTE 47: %02x\n", buffer[12]);
+    printf("N: %d\n", n);
     close(socket_fd);
     return 0;
 }
