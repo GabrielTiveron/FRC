@@ -44,6 +44,69 @@ void DnsFormat(unsigned char *dns, unsigned char *host) {
     }
 }
 
+void get_mail(unsigned char * buffer){
+  int qtd_answer = (int) buffer[7];
+  int domain_id  = 12;
+  char * domain_name = malloc(100*sizeof(char*));
+  char mail[qtd_answer][200];
+
+  int mail_id = 0, len = 1, marker, index = 0;
+
+  for(int k = domain_id; len > 0; k += len+1){
+    len = buffer[k];
+    if(len == 0)break;
+    for(int t = k+1; t < k+len+1; t++, index++){
+      domain_name[index] = (char) buffer[t];
+      marker = t;
+    }
+    domain_name[index++] = '.';
+  }
+  domain_name[--index] = '\0';
+
+  if(buffer[3] == 0x83){
+    printf("Dominio %s não encontrado.\n", domain_name);
+    return;
+  }
+
+  if(qtd_answer == 0){
+    printf("Dominio %s nao possui entrada MX\n", domain_name);
+    return;
+  }
+
+  marker += 20;
+  int k, compress_marker;
+  int is_compressed = 0;
+
+  for(int i = 0; i < qtd_answer; i++){
+    index = 0;
+    len = 1;
+    compress_marker = 0;
+    for(k = marker; len > 0; k += len+1){
+      len = buffer[k];
+      if(len == 0)break;
+      if(len == 0xc0){
+        is_compressed = 1;
+        if(k+1 > compress_marker)
+          compress_marker = k+1;
+        k = buffer[++k];
+        len = buffer[k];
+      }
+      for(int t = k+1; t < k+len+1; t++, index++){
+        mail[i][index] = buffer[t];
+        marker = t;
+      }
+      mail[i][index++] = '.';
+    }
+    mail[i][--index] = '\0';
+    marker = compress_marker + 15;
+  }
+  
+  for(int i = 0; i < qtd_answer; i++)
+    printf("%s <> %s\n", domain_name, mail[i]);
+
+  
+}
+
 int main(int argc, char **argv) {
     unsigned char *msg = argv[1];
     unsigned char *address = argv[2];
@@ -98,21 +161,15 @@ int main(int argc, char **argv) {
     } else if (package[35] % 38) {
         printf("Dominio %s nao encontrado\n", msg);
     } else {
-        if (n > 75) {
-            printf("Dominio %s nao possui entrada MX\n", msg);
-            return 0;
-        }
+//        if (n > 75) {
+  //          printf("Dominio %s nao possui entrada MX\n", msg);
+    //        return 0;
+      //  }
+      //
+      get_mail(buffer);
 
-        printf("%s <> %c%c%c%c%c%c.%c%c%c%c.%c%c%c%c%c%c%c%c%c%c.%c%c%c%c%c%c%c.%c%c%c\n",
-               msg,
-               package[n-35], package[n-34], package[n-33], package[n-32], package[n - 31], package[n - 30],
-               package[n-28], package[n-27], package[n-26],
-               package[n-25], package[n-23], package[n-22],
-               package[n-21], package[n-20], package[n-19], package[n-18], package[n-17], package[n-16],
-               package[n-15], package[n-14], package[n-12],
-               package[n-11], package[n-10], package[n-9], package[n - 8], package[n - 7], package[n - 6],
-               package[n-4],  package[n-3],  package[n-2]);
     }
+      
     close(socket_fd);
     return 0;
 }
